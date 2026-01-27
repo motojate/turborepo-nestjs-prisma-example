@@ -36,3 +36,9 @@ yarn-error.log*
 # Misc
 .DS_Store
 *.pem
+
+# prisma generated client
+packages/**/src/generated/prisma/
+packages/**/generated/prisma/
+
+.env

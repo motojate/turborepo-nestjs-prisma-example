@@ -1,0 +1,166 @@
+generator client {
+  provider        = "prisma-client"
+  output          = "../src/generated/prisma"
+  previewFeatures = ["views"]
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model Renderer {
+  id              BigInt       @id @default(autoincrement())
+  rendererId      String       @map("renderer_id")
+  rendererName    String?      @map("renderer_name")
+  rendererGroup   String?      @map("renderer_group")
+  rendererAddress String       @map("renderer_address")
+  rendererPort    Int          @default(0) @map("renderer_port")
+  startTime       String?      @map("start_time")
+  signalKey       String       @map("signal_key") @db.VarChar(10)
+  maxUsers        Int          @default(0) @map("max_users")
+  lastTickTime    DateTime?    @map("last_tick_time") @db.Timestamptz(6)
+  lastTockTime    DateTime?    @map("last_tock_time") @db.Timestamptz(6)
+  createdAt       DateTime     @default(dbgenerated()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime     @default(dbgenerated()) @map("updated_at") @db.Timestamptz(6)
+  signalServer    SignalServer @relation(fields: [signalKey], references: [signalKey])
+
+  @@unique([rendererId, signalKey], map: "RENDERER_renderer_id_signal_key_uk")
+  @@index([signalKey], map: "RENDERER_signal_key_idx")
+  @@index([signalKey, rendererGroup], map: "RENDERER_signal_key_group_idx")
+  @@map("RENDERER")
+}
+
+model SignalServerOffHistory {
+  id            BigInt   @id @default(autoincrement())
+  signalKey     String   @map("signal_key") @db.VarChar(10)
+  signalUrl     String   @map("signal_url")
+  offObservedAt DateTime @map("off_observed_at") @db.Timestamptz(6)
+
+  @@index([signalKey, offObservedAt(sort: Desc)], map: "SSOH_signal_key_off_observed_idx")
+  @@map("SIGNAL_SERVER_OFF_HISTORY")
+}
+
+model RendererOffHistory {
+  id              BigInt   @id @default(autoincrement())
+  rendererId      String   @map("renderer_id")
+  rendererName    String?  @map("renderer_name")
+  rendererGroup   String?  @map("renderer_group")
+  rendererAddress String   @map("renderer_address")
+  startTime       String?  @map("start_time")
+  signalKey       String   @map("signal_key") @db.VarChar(10)
+  signalUrl       String   @map("signal_url")
+  offObservedAt   DateTime @map("off_observed_at") @db.Timestamptz(6)
+
+  @@index([rendererId, offObservedAt(sort: Desc)], map: "ROH_renderer_off_observed_idx")
+  @@map("RENDERER_OFF_HISTORY")
+}
+
+model ViewerHistory {
+  id             BigInt    @default(autoincrement())
+  rendererId     String    @map("renderer_id")
+  rendererGroup  String?   @map("renderer_group")
+  signalKey      String    @map("signal_key") @db.VarChar(10)
+  signalUrl      String    @map("signal_url")
+  sessionId      String    @map("session_id")
+  viewerId       String    @map("viewer_id")
+  viewerIp       String    @map("viewer_ip")
+  viewerAgent    String?   @map("viewer_agent")
+  viewerPort     Int?      @map("viewer_port")
+  isInternalUser Boolean   @map("is_internal_user")
+  projectId      Int       @map("project_id")
+  clientId       String    @map("client_id")
+  isHost         Boolean   @map("is_host")
+  startedAt      DateTime  @map("started_at") @db.Timestamptz(0)
+  endedAt        DateTime? @map("ended_at") @db.Timestamptz(0)
+  durationSec    Int       @default(0) @map("duration_sec")
+  createdAt      DateTime  @default(dbgenerated()) @map("created_at") @db.Timestamptz(6)
+
+  @@id([id, startedAt], map: "VIEWER_HISTORY_pkey")
+  @@unique([sessionId, viewerId, startedAt], map: "VIEWER_HISTORY_session_viewer_uk")
+  @@index([rendererId, signalKey, startedAt(sort: Desc)], map: "VIEWER_HISTORY_renderer_signal_started_idx")
+  @@index([rendererGroup, signalKey, startedAt(sort: Desc)], map: "VIEWER_HISTORY_group_signal_started_idx")
+  @@index([startedAt(sort: Desc)], map: "VIEWER_HISTORY_started_at_idx")
+  @@map("VIEWER_HISTORY")
+}
+
+model SignalServer {
+  id          BigInt   @id @default(autoincrement())
+  signalKey   String   @unique @map("signal_key") @db.VarChar(10)
+  signalUrl   String   @unique @map("signal_url")
+  description String?  @map("description")
+  createdAt   DateTime @default(dbgenerated()) @map("created_at") @db.Timestamptz(6)
+
+  renderers Renderer[]
+
+  @@index([signalKey], map: "SIGNAL_SERVER_key_idx")
+  @@map("SIGNAL_SERVER")
+}
+
+model RendererHistory {
+  time          DateTime @default(dbgenerated()) @db.Timestamptz(0)
+  rendererId    String   @map("renderer_id")
+  signalKey     String   @map("signal_key") @db.VarChar(10)
+  signalUrl     String   @map("signal_url")
+  rendererName  String?  @map("renderer_name")
+  rendererGroup String?  @map("renderer_group")
+  viewerCount   Int      @default(0) @map("viewer_count")
+
+  @@id([time, rendererId, signalKey], map: "RENDERER_HISTORY_pkey")
+  @@index([time(sort: Desc)], map: "RENDERER_HISTORY_time_idx")
+  @@index([signalKey, time(sort: Desc)], map: "RENDERER_HISTORY_signal_key_time_idx")
+  @@index([rendererGroup, time(sort: Desc)], map: "RENDERER_HISTORY_group_time_idx")
+  @@map("RENDERER_HISTORY")
+}
+
+/// [View] 분당 통계 (6개월 보관)
+view RendererStatsMinutely {
+  bucket        DateTime @map("bucket") @db.Timestamptz(0)
+  signalKey     String   @map("signal_key") @db.VarChar(10)
+  rendererId    String   @map("renderer_id")
+  rendererGroup String?  @map("renderer_group")
+  avgCcu        Float    @map("avg_ccu") @db.DoublePrecision
+  maxCcu        Int      @map("max_ccu")
+  minCcu        Int      @map("min_ccu")
+  medianCcu     Float    @map("median_ccu") @db.DoublePrecision
+  p95Ccu        Float    @map("p95_ccu") @db.DoublePrecision
+  p99Ccu        Float    @map("p99_ccu") @db.DoublePrecision
+
+  @@unique([bucket, signalKey, rendererId])
+  @@map("RENDERER_STATS_MINUTELY")
+}
+
+/// [View] 시간당 통계 (영구 보관)
+view RendererStatsHourly {
+  bucket        DateTime @map("bucket") @db.Timestamptz(0)
+  signalKey     String   @map("signal_key") @db.VarChar(10)
+  rendererId    String   @map("renderer_id")
+  rendererGroup String?  @map("renderer_group")
+  avgCcu        Float    @map("avg_ccu")
+  maxCcu        Int      @map("max_ccu")
+  minCcu        Int      @map("min_ccu")
+  medianCcu     Float    @map("median_ccu") @db.DoublePrecision
+  p95Ccu        Float    @map("p95_ccu") @db.DoublePrecision
+  p99Ccu        Float    @map("p99_ccu") @db.DoublePrecision
+
+  @@unique([bucket, signalKey, rendererId])
+  @@map("RENDERER_STATS_HOURLY")
+}
+
+/// [View] 일간 통계 (영구 보관)
+view RendererStatsDaily {
+  bucket        DateTime @map("bucket") @db.Timestamptz(0)
+  signalKey     String   @map("signal_key") @db.VarChar(10)
+  rendererId    String   @map("renderer_id")
+  rendererGroup String?  @map("renderer_group")
+  avgCcu        Float    @map("avg_ccu")
+  maxCcu        Int      @map("max_ccu")
+  minCcu        Int      @map("min_ccu")
+  medianCcu     Float    @map("median_ccu") @db.DoublePrecision
+  p95Ccu        Float    @map("p95_ccu") @db.DoublePrecision
+  p99Ccu        Float    @map("p99_ccu") @db.DoublePrecision
+
+  @@unique([bucket, signalKey, rendererId])
+  @@map("RENDERER_STATS_DAILY")
+}
