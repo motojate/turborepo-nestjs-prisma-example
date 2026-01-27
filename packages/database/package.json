@@ -11,6 +11,9 @@
       "default": "./dist/index.js"
     }
   },
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "db:generate": "prisma generate"
@@ -25,7 +28,6 @@
   },
   "peerDependencies": {
     "@nestjs/common": "^11.1.12",
-    "@nestjs/config": "^4.0.2",
     "@nestjs/core": "^11.1.12"
   }
 }

@@ -1,6 +1,7 @@
 import { Pool } from "pg";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { Prisma, PrismaClient } from "./generated/prisma/client";
+import { PrismaClientOptions } from "./prisma.types";
 
 const READ_OPERATIONS = new Set<string>([
   "findUnique",
@@ -14,45 +15,31 @@ const READ_OPERATIONS = new Set<string>([
 ]);
 
 function assertReadOnly(model: string, operation: string): void {
-  if (!READ_OPERATIONS.has(operation))
+  if (!READ_OPERATIONS.has(operation)) {
     throw new Error(
       `[PrismaReadOnly] Forbidden write operation: ${model}.${operation}()`,
     );
+  }
 }
 
-export type PrismaClientFactoryOptions = Readonly<{
-  url: string;
-  appName: string;
-  pool?: Readonly<{
-    max?: number;
-    idleTimeoutMillis?: number;
-    connectionTimeoutMillis?: number;
-  }>;
-  log?: Prisma.LogLevel[];
-  readOnly: boolean;
-}>;
+const DEFAULT_POOL = Object.freeze({
+  max: 15,
+  idleTimeoutMillis: 10_000,
+  connectionTimeoutMillis: 5_000,
+});
 
-export function createPrismaClientWithAdapterPg(
-  options: PrismaClientFactoryOptions,
-): { prisma: PrismaClient; pool: Pool } {
-  const pool = new Pool({
-    connectionString: options.url,
-    application_name: options.appName,
-    max: options.pool?.max,
-    idleTimeoutMillis: options.pool?.idleTimeoutMillis,
-    connectionTimeoutMillis: options.pool?.connectionTimeoutMillis,
-  });
+function withDefaultsPool(pool?: PrismaClientOptions["pool"]) {
+  return {
+    max: pool?.max ?? DEFAULT_POOL.max,
+    idleTimeoutMillis:
+      pool?.idleTimeoutMillis ?? DEFAULT_POOL.idleTimeoutMillis,
+    connectionTimeoutMillis:
+      pool?.connectionTimeoutMillis ?? DEFAULT_POOL.connectionTimeoutMillis,
+  };
+}
 
-  const adapter = new PrismaPg(pool);
-
-  const basePrisma = new PrismaClient({
-    adapter,
-    log: options.log ?? ["query", "warn", "info", "error"],
-  });
-
-  if (!options.readOnly) return { prisma: basePrisma, pool };
-
-  const roClient = basePrisma.$extends({
+function applyReadOnlyGuard(base: PrismaClient): PrismaClient {
+  const ro = base.$extends({
     query: {
       $allModels: {
         async $allOperations({ model, operation, args, query }) {
@@ -68,8 +55,59 @@ export function createPrismaClientWithAdapterPg(
       $executeRawUnsafe: async () => {
         throw new Error("[PrismaReadOnly] Forbidden: $executeRawUnsafe");
       },
+      // $queryRaw: async () => {
+      //   throw new Error("[PrismaReadOnly] Forbidden: $queryRaw");
+      // },
+      // $queryRawUnsafe: async () => {
+      //   throw new Error("[PrismaReadOnly] Forbidden: $queryRawUnsafe");
+      // },
     },
-  }) as unknown as PrismaClient;
+  });
 
-  return { prisma: roClient, pool };
+  return ro as unknown as PrismaClient;
+}
+
+export type PrismaCreateResult = Readonly<{
+  prisma: PrismaClient;
+  pool: Pool;
+  eagerConnect: boolean;
+}>;
+
+function createBase(options: PrismaClientOptions): {
+  prisma: PrismaClient;
+  pool: Pool;
+} {
+  const poolOpts = withDefaultsPool(options.pool);
+
+  const pool = new Pool({
+    connectionString: options.url,
+    application_name: options.appName,
+    max: poolOpts.max,
+    idleTimeoutMillis: poolOpts.idleTimeoutMillis,
+    connectionTimeoutMillis: poolOpts.connectionTimeoutMillis,
+  });
+
+  const adapter = new PrismaPg(pool);
+
+  const prisma = new PrismaClient({
+    adapter,
+    log: options.log ?? ["warn", "error"],
+  });
+
+  return { prisma, pool };
+}
+
+export function createWriteClient(
+  options: PrismaClientOptions,
+): PrismaCreateResult {
+  const { prisma, pool } = createBase(options);
+  return { prisma, pool, eagerConnect: options.eagerConnect ?? false };
+}
+
+export function createReadClient(
+  options: PrismaClientOptions,
+): PrismaCreateResult {
+  const { prisma: base, pool } = createBase(options);
+  const prisma = applyReadOnlyGuard(base);
+  return { prisma, pool, eagerConnect: options.eagerConnect ?? false };
 }
