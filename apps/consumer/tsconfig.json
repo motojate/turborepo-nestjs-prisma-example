@@ -1,0 +1,7 @@
+{
+  "extends": "@renderer-orchestrator/typescript-config/nest.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "baseUrl": "./"
+  }
+}
