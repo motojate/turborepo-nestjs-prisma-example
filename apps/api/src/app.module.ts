@@ -2,17 +2,15 @@ import { Module } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { ConfigModule } from '@nestjs/config';
-import { PrismaModule } from '@renderer-orchestrator/database';
+import { DatabaseModule } from './shared/database/database.module';
+import { TestModule } from './test/test.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
-    PrismaModule.forReadOnly({
-      url: 'test',
-      appName: 'api',
-      eagerConnect: false,
-      pool: { max: 50 },
-    }),
+
+    TestModule,
+    DatabaseModule,
   ],
   controllers: [AppController],
   providers: [AppService],

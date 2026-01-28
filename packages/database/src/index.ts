@@ -1,6 +1,17 @@
-export * from "./prisma.module";
-export * from "./prisma.tokens";
-export * from "./prisma.types";
+export type { PrismaClientOptions } from "./prisma.types";
 
-export * from "./prisma-read.service";
-export * from "./prisma-write.service";
+export { createReadClient, createWriteClient } from "./prisma.factory";
+export type { PrismaCreateResult } from "./prisma.factory";
+
+export { PrismaClientManager } from "./prisma.manager";
+
+export {
+  createPrismaProviders,
+  InjectPrismaRead,
+  InjectPrismaWrite,
+} from "./prisma.di";
+export type {
+  PrismaProvidersOptions,
+  PrismaReadClient,
+  PrismaWriteClient,
+} from "./prisma.di";

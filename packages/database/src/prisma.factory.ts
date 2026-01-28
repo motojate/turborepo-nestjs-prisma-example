@@ -1,6 +1,6 @@
 import { Pool } from "pg";
 import { PrismaPg } from "@prisma/adapter-pg";
-import { Prisma, PrismaClient } from "./generated/prisma/client";
+import { PrismaClient } from "./generated/prisma/client";
 import { PrismaClientOptions } from "./prisma.types";
 
 const READ_OPERATIONS = new Set<string>([
@@ -28,7 +28,7 @@ const DEFAULT_POOL = Object.freeze({
   connectionTimeoutMillis: 5_000,
 });
 
-function withDefaultsPool(pool?: PrismaClientOptions["pool"]) {
+function withDefaultPool(pool?: PrismaClientOptions["pool"]) {
   return {
     max: pool?.max ?? DEFAULT_POOL.max,
     idleTimeoutMillis:
@@ -55,6 +55,10 @@ function applyReadOnlyGuard(base: PrismaClient): PrismaClient {
       $executeRawUnsafe: async () => {
         throw new Error("[PrismaReadOnly] Forbidden: $executeRawUnsafe");
       },
+      // Policy choice:
+      // - keep allowed for read-only reporting use cases, or
+      // - uncomment to forbid raw queries completely.
+      //
       // $queryRaw: async () => {
       //   throw new Error("[PrismaReadOnly] Forbidden: $queryRaw");
       // },
@@ -67,6 +71,9 @@ function applyReadOnlyGuard(base: PrismaClient): PrismaClient {
   return ro as unknown as PrismaClient;
 }
 
+/**
+ * Result of creating a Prisma client and its underlying pg.Pool.
+ */
 export type PrismaCreateResult = Readonly<{
   prisma: PrismaClient;
   pool: Pool;
@@ -77,7 +84,7 @@ function createBase(options: PrismaClientOptions): {
   prisma: PrismaClient;
   pool: Pool;
 } {
-  const poolOpts = withDefaultsPool(options.pool);
+  const poolOpts = withDefaultPool(options.pool);
 
   const pool = new Pool({
     connectionString: options.url,
@@ -97,6 +104,9 @@ function createBase(options: PrismaClientOptions): {
   return { prisma, pool };
 }
 
+/**
+ * Creates a standard read/write Prisma client.
+ */
 export function createWriteClient(
   options: PrismaClientOptions,
 ): PrismaCreateResult {
@@ -104,6 +114,9 @@ export function createWriteClient(
   return { prisma, pool, eagerConnect: options.eagerConnect ?? false };
 }
 
+/**
+ * Creates a read-only Prisma client by applying a query-level guard.
+ */
 export function createReadClient(
   options: PrismaClientOptions,
 ): PrismaCreateResult {
