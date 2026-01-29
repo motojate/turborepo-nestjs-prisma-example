@@ -1,10 +1,6 @@
 import { Pool } from "pg";
 import { PrismaPg } from "@prisma/adapter-pg";
-import type {
-  PrismaClientCtor,
-  PrismaClientLike,
-  PrismaLogLevel,
-} from "./prisma.types";
+import type { PrismaClientLike, PrismaLogLevel } from "./prisma.types";
 import { applyReadOnlyGuard } from "./prisma-readonly.guard";
 
 export type PgPoolOptions = Readonly<{

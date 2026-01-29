@@ -35,6 +35,9 @@ importers:
       '@renderer-orchestrator/database':
         specifier: workspace:*
         version: link:../../packages/database
+      '@renderer-orchestrator/schema':
+        specifier: workspace:*
+        version: link:../../packages/schema
       reflect-metadata:
         specifier: ^0.2.2
         version: 0.2.2
@@ -284,6 +287,12 @@ importers:
         version: 8.54.0(eslint@9.39.2(jiti@2.6.1))(typescript@5.9.3)
 
   packages/redis: {}
+
+  packages/schema:
+    devDependencies:
+      prisma:
+        specifier: 7.3.0
+        version: 7.3.0(@types/react@19.2.9)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3)
 
   packages/typescript-config: {}
 

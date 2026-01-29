@@ -1,71 +1,28 @@
-import {
-  DynamicModule,
-  InjectionToken,
-  Module,
-  ModuleMetadata,
-  OptionalFactoryDependency,
-  Provider,
-} from "@nestjs/common";
-import { PrismaService } from "./prisma.service";
+import { DynamicModule, Module, Provider } from "@nestjs/common";
 import type {
-  PrismaClientCtor,
-  PrismaClientLike,
-  PrismaLogLevel,
-} from "./prisma.types";
-import type { PgPoolOptions } from "./prisma-pg.factory";
-
-export type PrismaModuleOptions<TClient extends PrismaClientLike> = Readonly<{
-  clientCtor: PrismaClientCtor<TClient>;
-
-  url: string;
-  appName?: string;
-  log?: readonly PrismaLogLevel[];
-  pool?: PgPoolOptions;
-
-  /**
-   * read-only guard 적용 여부 (레플리카를 read 전용으로 쓰는 경우 추천)
-   */
-  readOnlyGuard?: boolean;
-
-  /**
-   * 기존처럼 module init 시 connect/disconnect를 PrismaService가 수행
-   */
-  eagerConnect?: boolean;
-
-  isGlobal?: boolean;
-}>;
-
-export type PrismaModuleAsyncOptions<TClient extends PrismaClientLike> =
-  Readonly<{
-    clientCtor: PrismaClientCtor<TClient>;
-    isGlobal?: boolean;
-
-    imports?: ModuleMetadata["imports"];
-    inject?: (InjectionToken | OptionalFactoryDependency)[];
-    useFactory: (
-      ...args: readonly unknown[]
-    ) =>
-      | Promise<Omit<PrismaModuleOptions<TClient>, "clientCtor" | "isGlobal">>
-      | Omit<PrismaModuleOptions<TClient>, "clientCtor" | "isGlobal">;
-  }>;
-
-export const PRISMA_OPTIONS = Symbol("PRISMA_OPTIONS");
+  PrismaModuleAsyncOptions,
+  PrismaModuleOptions,
+} from "./prisma.module-options";
+import { PrismaService } from "./prisma.service";
+import {
+  PRISMA_CLIENT,
+  PRISMA_INSTANCE,
+  PRISMA_OPTIONS,
+  PRISMA_POOL,
+} from "./prisma.tokens";
+import { PrismaClientLike, PrismaInstance } from "./prisma.types";
 
 @Module({})
 export class PrismaModule {
   static register<TClient extends PrismaClientLike>(
     options: PrismaModuleOptions<TClient>,
   ): DynamicModule {
-    const providers: Provider[] = [
-      { provide: PRISMA_OPTIONS, useValue: options },
-      PrismaService,
-    ];
-
+    const providers = buildProviders(options);
     return {
       module: PrismaModule,
       global: options.isGlobal ?? false,
       providers,
-      exports: [PrismaService],
+      exports: [PrismaService, PRISMA_CLIENT, PRISMA_POOL],
     };
   }
 
@@ -74,23 +31,61 @@ export class PrismaModule {
   ): DynamicModule {
     const optionsProvider: Provider = {
       provide: PRISMA_OPTIONS,
-      useFactory: async (...args: readonly unknown[]) => {
-        const partial = await options.useFactory(...args);
-        return {
-          ...partial,
-          cientCtor: options.clientCtor,
-          isGlobal: options.isGlobal ?? false,
-        };
-      },
+      useFactory: options.useFactory,
       inject: options.inject ?? [],
     };
+
+    const providers = buildProvidersFromToken();
 
     return {
       module: PrismaModule,
       global: options.isGlobal ?? false,
       imports: options.imports ?? [],
-      providers: [optionsProvider, PrismaService],
-      exports: [PrismaService],
+      providers: [optionsProvider, ...providers],
+      exports: [PrismaService, PRISMA_CLIENT, PRISMA_POOL],
     };
   }
+}
+
+function buildProviders<TClient extends PrismaClientLike>(
+  options: PrismaModuleOptions<TClient>,
+): Provider[] {
+  const instance = options.createInstance();
+  return [
+    { provide: PRISMA_OPTIONS, useValue: options },
+    { provide: PRISMA_INSTANCE, useValue: instance },
+    {
+      provide: PRISMA_CLIENT,
+      useFactory: (i: PrismaInstance<TClient>) => i.prisma,
+      inject: [PRISMA_INSTANCE],
+    },
+    {
+      provide: PRISMA_POOL,
+      useFactory: (i: PrismaInstance<TClient>) => i.pool ?? null,
+      inject: [PRISMA_INSTANCE],
+    },
+    PrismaService,
+  ];
+}
+
+function buildProvidersFromToken(): Provider[] {
+  return [
+    {
+      provide: PRISMA_INSTANCE,
+      inject: [PRISMA_OPTIONS],
+      useFactory: (opts: PrismaModuleOptions<PrismaClientLike>) =>
+        opts.createInstance(),
+    },
+    {
+      provide: PRISMA_CLIENT,
+      inject: [PRISMA_INSTANCE],
+      useFactory: (i: PrismaInstance<PrismaClientLike>) => i.prisma,
+    },
+    {
+      provide: PRISMA_POOL,
+      inject: [PRISMA_INSTANCE],
+      useFactory: (i: PrismaInstance<PrismaClientLike>) => i.pool ?? null,
+    },
+    PrismaService,
+  ];
 }

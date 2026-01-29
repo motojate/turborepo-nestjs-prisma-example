@@ -1,31 +1,40 @@
+import type { Pool } from "pg";
 import type {
+  InjectionToken,
   ModuleMetadata,
   OptionalFactoryDependency,
-  InjectionToken,
 } from "@nestjs/common";
-import type { Pool } from "pg";
+import type { PrismaClientLike } from "./prisma.types";
 
-export type PrismaLogLevel = "query" | "info" | "warn" | "error";
-
-export type PrismaClientLike = {
-  $connect(): Promise<void>;
-  $disconnect(): Promise<void>;
-};
-
+/**
+ * prisma + (선택) pool
+ * - adapter-pg: pool 있음
+ * - accelerate: pool 없음
+ */
 export type PrismaInstance<TClient extends PrismaClientLike> = Readonly<{
   prisma: TClient;
-  pool?: Pool; // accelerate면 pool 없음
+  pool?: Pool;
 }>;
 
 export type PrismaModuleOptions<TClient extends PrismaClientLike> = Readonly<{
+  /**
+   * global module 여부
+   */
   isGlobal?: boolean;
-  eagerConnect?: boolean;
-  readOnlyGuard?: boolean;
 
   /**
-   * ✅ 앱이 Prisma 인스턴스 생성 책임을 진다.
-   * - adapter-pg면 pool+prisma를 만들어서 반환
-   * - accelerate면 prisma만 반환
+   * module init 시 $connect 호출
+   */
+  eagerConnect?: boolean;
+
+  /**
+   * module destroy 시 $disconnect + pool.end
+   */
+  eagerDisconnect?: boolean;
+
+  /**
+   * Prisma 인스턴스 생성 책임은 "앱"이 진다.
+   * (라이브러리는 generated/edge/accelerate 타입을 몰라도 됨)
    */
   createInstance: () => PrismaInstance<TClient>;
 }>;
@@ -33,6 +42,7 @@ export type PrismaModuleOptions<TClient extends PrismaClientLike> = Readonly<{
 export type PrismaModuleAsyncOptions<TClient extends PrismaClientLike> =
   Readonly<{
     isGlobal?: boolean;
+
     imports?: ModuleMetadata["imports"];
     inject?: (InjectionToken | OptionalFactoryDependency)[];
 

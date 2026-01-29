@@ -3,51 +3,55 @@ import {
   Injectable,
   OnModuleDestroy,
   OnModuleInit,
+  Optional,
 } from "@nestjs/common";
-import { PrismaClientLike } from "./prisma.types";
-import { PRISMA_OPTIONS, PrismaModuleOptions } from "./prisma.module";
-import { createPrismaPgClient } from "./prisma-pg.factory";
-import { Pool } from "pg";
+import type { Pool } from "pg";
+import type { PrismaClientLike } from "./prisma.types";
+import type {
+  PrismaInstance,
+  PrismaModuleOptions,
+} from "./prisma.module-options";
+import {
+  PRISMA_CLIENT,
+  PRISMA_INSTANCE,
+  PRISMA_OPTIONS,
+} from "./prisma.tokens";
 
 @Injectable()
 export class PrismaService<TClient extends PrismaClientLike = PrismaClientLike>
   implements OnModuleInit, OnModuleDestroy
 {
-  private readonly client: TClient;
-  private readonly pool: Pool;
-  private readonly eagerConnect: boolean;
+  public readonly prisma: TClient;
+  public readonly pool?: Pool;
 
-  constructor(@Inject(PRISMA_OPTIONS) options: PrismaModuleOptions<TClient>) {
-    const { prisma, pool } = createPrismaPgClient({
-      url: options.url,
-      appName: options.appName,
-      clientCtor: options.clientCtor,
-      log: options.log,
-      pool: options.pool,
-      readOnlyGuard: options.readOnlyGuard,
-    });
-
-    this.client = prisma;
-    this.pool = pool;
-    this.eagerConnect = options.eagerConnect ?? true;
-
-    return new Proxy(this, {
-      get: (target, prop, receiver) => {
-        if (prop in target) {
-          const v = Reflect.get(target, prop, receiver) as unknown;
-          return v;
-        }
-        const c = target.client as unknown as Record<PropertyKey, unknown>;
-        return c[prop];
-      },
-    });
+  constructor(
+    @Inject(PRISMA_INSTANCE) instance: PrismaInstance<TClient>,
+    @Optional()
+    @Inject(PRISMA_OPTIONS)
+    private readonly options?: PrismaModuleOptions<TClient>,
+    // 편의상 client 토큰도 유지하고 싶으면 주입 가능 (필요 없으면 지워도 됨)
+    @Optional() @Inject(PRISMA_CLIENT) _client?: TClient,
+  ) {
+    this.prisma = instance.prisma;
+    this.pool = instance.pool;
   }
+
   async onModuleInit() {
-    if (!this.eagerConnect) return;
-    await this.client.$connect();
+    if (this.options?.eagerConnect) {
+      await this.prisma.$connect();
+    }
   }
+
   async onModuleDestroy() {
-    await this.client.$disconnect();
-    await this.pool.end();
+    // 기본값: disconnect는 true로 두는 게 안전
+    const shouldDisconnect = this.options?.eagerDisconnect ?? true;
+
+    if (!shouldDisconnect) return;
+
+    try {
+      await this.prisma.$disconnect();
+    } finally {
+      await this.pool?.end?.();
+    }
   }
 }
