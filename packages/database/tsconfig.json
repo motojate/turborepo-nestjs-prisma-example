@@ -6,7 +6,7 @@
     "declaration": true,
     "sourceMap": true,
     "outDir": "./dist",
-    "rootDir": "./src",
+    "baseUrl": ".",
 
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
@@ -16,6 +16,6 @@
     "strict": true,
     "strictPropertyInitialization": false
   },
-  "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "prisma"]
+  "include": ["src/**/*", "generated/**/*"],
+  "exclude": ["node_modules", "dist", "schema"]
 }

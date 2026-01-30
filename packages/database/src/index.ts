@@ -1,2 +1,2 @@
-export * from "./prisma/prisma.module";
-export * from "./prisma/prisma.service";
+export { applyReadOnlyGuard } from "./prisma/readonly.guard";
+export { createPrismaPgClient } from "./prisma/client-postgresql";

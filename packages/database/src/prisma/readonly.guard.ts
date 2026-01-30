@@ -1,4 +1,4 @@
-import type { PrismaClientLike } from "./prisma.types";
+import { PrismaClient } from "generated/prisma/client";
 
 const READ_OPERATIONS = new Set<string>([
   "findUnique",
@@ -9,20 +9,20 @@ const READ_OPERATIONS = new Set<string>([
   "count",
   "aggregate",
   "groupBy",
+  "$queryRaw",
+  "$queryRawUnsafe",
 ]);
 
-function assertReadOnly(model: string, operation: string): void {
+const assertReadOnly = (model: string, operation: string): void => {
   if (!READ_OPERATIONS.has(operation)) {
     throw new Error(
       `[PrismaReadOnly] Forbidden write operation: ${model}.${operation}()`,
     );
   }
-}
+};
 
-export function applyReadOnlyGuard<TClient extends PrismaClientLike>(
-  base: TClient,
-): TClient {
-  const ro = base.$extends({
+export const applyReadOnlyGuard = (prisma: PrismaClient): PrismaClient => {
+  return prisma.$extends({
     query: {
       $allModels: {
         $allOperations: async ({ model, operation, args, query }) => {
@@ -39,7 +39,5 @@ export function applyReadOnlyGuard<TClient extends PrismaClientLike>(
         throw new Error("[PrismaReadOnly] Forbidden: $executeRawUnsafe");
       },
     },
-  });
-
-  return ro as TClient;
-}
+  }) as unknown as PrismaClient;
+};

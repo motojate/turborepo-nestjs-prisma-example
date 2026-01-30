@@ -38,7 +38,7 @@ yarn-error.log*
 *.pem
 
 # prisma generated client
-packages/**/src/generated/prisma/
-packages/**/generated/prisma/
+packages/**/generated
+
 
 .env
