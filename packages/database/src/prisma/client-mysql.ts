@@ -1,4 +1,4 @@
-import { PrismaClient } from "generated/prisma/client";
+import { PrismaClient } from "../generated/client";
 
 // TODO: MySQL version update
 export class PrismaMySQLClient extends PrismaClient {

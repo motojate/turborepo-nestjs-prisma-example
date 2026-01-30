@@ -1,6 +1,6 @@
 import { Pool } from "pg";
 import { PrismaPg } from "@prisma/adapter-pg";
-import { Prisma, PrismaClient } from "generated/prisma/client";
+import { Prisma, PrismaClient } from "../generated/client";
 
 const DEFAULT_POOL_OPTIONS: Required<PgPoolOptions> = {
   max: 15,
