@@ -9,11 +9,12 @@ import {
 export class PrismaReadService implements OnModuleInit, OnModuleDestroy {
   public readonly db: PrismaClient;
   private readonly dispose: () => Promise<void>;
+  private readonly ping: () => Promise<void>;
 
   constructor() {
-    const { client, dispose } = createPrismaPgClient({
+    const { client, dispose, ping } = createPrismaPgClient({
       appName: 'api',
-      log: ['warn'],
+      log: ['info', 'query', 'error', 'warn'],
       pool: {
         max: 50,
       },
@@ -22,10 +23,13 @@ export class PrismaReadService implements OnModuleInit, OnModuleDestroy {
     });
 
     this.db = applyReadOnlyGuard(client);
+
     this.dispose = dispose;
+    this.ping = ping;
   }
 
   async onModuleInit() {
+    await this.ping();
     await this.db.$connect();
   }
   async onModuleDestroy() {

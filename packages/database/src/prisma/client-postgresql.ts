@@ -43,10 +43,14 @@ export const createPrismaPgClient = (options: PrismaPgClientOptions) => {
     log,
   });
 
+  const ping = async () => {
+    await pool.query("select 1");
+  };
+
   const dispose = async () => {
     await client.$disconnect().catch(() => undefined);
     await pool.end().catch(() => undefined);
   };
 
-  return { client, dispose } as const;
+  return { client, dispose, ping } as const;
 };
