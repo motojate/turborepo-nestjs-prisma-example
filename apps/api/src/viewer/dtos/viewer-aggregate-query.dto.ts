@@ -10,11 +10,11 @@ export class ViewerAggregateQueryDto {
   @IsEnum(ViewerAggregateInterval)
   format!: ViewerAggregateInterval;
 
-  //   @Transform(({ value }) => convertToUtc(value))
+  @Transform(({ value }) => new Date(value))
   @IsDate()
   startDateTime!: Date;
 
-  //   @Transform(({ value }) => convertToUtc(value))
+  @Transform(({ value }) => new Date(value))
   @IsDate()
   endDateTime!: Date;
 
