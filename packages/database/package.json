@@ -16,8 +16,9 @@
     "prisma:generate": "prisma generate"
   },
   "dependencies": {
+    "@prisma/adapter-pg": "7.3.0",
     "@prisma/client": "7.3.0",
-    "@prisma/adapter-pg": "7.3.0"
+    "@prisma/extension-read-replicas": "^0.5.0"
   },
   "devDependencies": {
     "@types/pg": "^8.16.0",

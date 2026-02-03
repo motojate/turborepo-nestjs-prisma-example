@@ -1,7 +1,7 @@
-import { Injectable } from '@nestjs/common';
-import { PrismaReadService } from 'src/shared/database/prisma-read.service';
+import { Inject, Injectable } from '@nestjs/common';
 import { ViewerAggregateQueryDto } from '../dtos/viewer-aggregate-query.dto';
-import { Prisma } from '@renderer-orchestrator/database';
+import { Prisma, PrismaClient } from '@renderer-orchestrator/database';
+import { PRISMA_READ_CLIENT } from 'src/common/tokens/prisma.token';
 
 export type RawViewerItem = {
   sessionId: string;
@@ -24,7 +24,9 @@ export type ViewerDbResultRaw = {
 
 @Injectable()
 export class ViewerRepository {
-  constructor(private readonly prisma: PrismaReadService) {}
+  constructor(
+    @Inject(PRISMA_READ_CLIENT) private readonly prisma: PrismaClient,
+  ) {}
 
   async findRawAggregates(dto: ViewerAggregateQueryDto) {
     const { signalKey, format, startDateTime, endDateTime, rendererGroup } =
@@ -70,7 +72,7 @@ export class ViewerRepository {
       (acc, cur) => Prisma.sql`${acc} AND ${cur}`,
     );
 
-    return this.prisma.db.$queryRaw<ViewerDbResultRaw[]>`
+    return this.prisma.$queryRaw<ViewerDbResultRaw[]>`
     SELECT 
       date_bin(${interval}::interval, started_at, ${startDateTime}) AS time_bucket,
       COUNT(*)::int AS count,
