@@ -75,16 +75,11 @@ export const createPrismaPgClient = (options: PrismaPgClientOptions) => {
   const client = isReadonly ? applyReadonlyPlugin(baseClient) : baseClient;
 
   const ping = async (): Promise<void> => {
+    const c = await pool.connect();
     try {
-      const c = await pool.connect();
-      try {
-        await c.query("SELECT 1");
-      } finally {
-        c.release();
-      }
-    } catch (err) {
-      safeCallOnError(err, "ping");
-      throw err;
+      await c.query("SELECT 1");
+    } finally {
+      c.release();
     }
   };
 

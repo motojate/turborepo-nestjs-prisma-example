@@ -5,11 +5,7 @@ import {
   OnModuleDestroy,
   OnModuleInit,
 } from '@nestjs/common';
-import {
-  createPrismaPgClient,
-  Prisma,
-  PrismaClient,
-} from '@renderer-orchestrator/database';
+import { createPrismaPgClient } from '@renderer-orchestrator/database';
 import { PrismaPgHandle } from '@renderer-orchestrator/database/dist/prisma/client-postgresql';
 import {
   PRISMA_READ_CLIENT,
