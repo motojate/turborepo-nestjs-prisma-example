@@ -1,10 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { ViewerRepository } from './repository/viewer.repository';
 import { ViewerAggregateQueryDto } from './dtos/viewer-aggregate-query.dto';
+import { RendererHistoryService } from 'src/renderer-history/renderer-history.service';
 
 @Injectable()
 export class ViewerService {
-  constructor(private readonly viewerRepository: ViewerRepository) {}
+  constructor(
+    private readonly viewerRepository: ViewerRepository,
+    private readonly rendererHistoryService: RendererHistoryService,
+  ) {}
 
   async getAggregates(dto: ViewerAggregateQueryDto) {
     const rawDataPromise = this.viewerRepository.findRawAggregates(dto);
@@ -26,5 +30,8 @@ export class ViewerService {
     console.log(rawDataPromise);
 
     return rawDataPromise;
+  }
+  async getStartedAtUtc(dto: { signalKey: string; rendererGroup?: string }) {
+    return this.rendererHistoryService.getStartedAtUtc(dto);
   }
 }

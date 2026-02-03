@@ -1,7 +1,7 @@
 import { IsDate, IsEnum, IsOptional, IsString, Length } from 'class-validator';
 import { ViewerAggregateInterval } from '../enums/viewer-aggregate-interval.enum';
 import { Transform } from 'class-transformer';
-import { convertToUtc } from 'src/common/utils/date.util';
+import { dateUtil } from 'src/common/utils/date.util';
 
 export class ViewerAggregateQueryDto {
   @IsString()
@@ -11,11 +11,11 @@ export class ViewerAggregateQueryDto {
   @IsEnum(ViewerAggregateInterval)
   format!: ViewerAggregateInterval;
 
-  @Transform(({ value }) => convertToUtc(value))
+  @Transform(({ value }) => dateUtil.convertToUtc(value))
   @IsDate()
   startDateTime!: Date;
 
-  @Transform(({ value }) => convertToUtc(value))
+  @Transform(({ value }) => dateUtil.convertToUtc(value))
   @IsDate()
   endDateTime!: Date;
 

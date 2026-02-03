@@ -24,9 +24,6 @@ import {
           pool: { max: 50 },
           url: process.env.DATABASE_RO_URL,
           isReadonly: true,
-          onError: (e) => {
-            console.error('[PRISMA_RO]', e);
-          },
         });
       },
     },

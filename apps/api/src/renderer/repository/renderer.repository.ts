@@ -22,4 +22,21 @@ export class RendererRepository {
 
     return data.map((v) => v.rendererGroup);
   }
+
+  async findAllRenderersByFilter(signalKey: string, rendererGroup?: string) {
+    return this.prisma.renderer.findMany({
+      where: {
+        signalKey,
+        rendererGroup,
+      },
+      select: {
+        rendererGroup: true,
+        rendererId: true,
+        rendererName: true,
+        signalServer: {
+          select: { signalUrl: true, signalKey: true, description: true },
+        },
+      },
+    });
+  }
 }

@@ -12,4 +12,17 @@ export class ViewerController {
 
     return res;
   }
+
+  @Get('stats/started-at')
+  async getStartedAtUtc(
+    @Query('signalKey') signalKey: string,
+    @Query('rendererGroup') rendererGroup?: string,
+  ) {
+    const startedAtUtc = await this.viewerService.getStartedAtUtc({
+      signalKey,
+      rendererGroup,
+    });
+
+    return { startedAtUtc };
+  }
 }
