@@ -10,7 +10,14 @@ export class ViewerController {
   async aggregate(@Query() dto: ViewerAggregateQueryDto) {
     const res = await this.viewerService.getAggregates(dto);
 
-    return res;
+    return {
+      signalKey: dto.signalKey,
+      format: dto.format,
+      startDateTime: dto.startDateTime,
+      endDateTime: dto.endDateTime,
+      rendererGroup: dto.rendererGroup,
+      ...res,
+    };
   }
 
   @Get('stats/started-at')

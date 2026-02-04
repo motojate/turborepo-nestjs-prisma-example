@@ -2,25 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { ViewerAggregateQueryDto } from '../dtos/viewer-aggregate-query.dto';
 import { Prisma, PrismaClient } from '@renderer-orchestrator/database';
 import { PRISMA_READ_CLIENT } from 'src/common/tokens/prisma.token';
-
-export type RawViewerItem = {
-  sessionId: string;
-  viewerId: string;
-  viewerIp: string;
-  viewerAgent: string;
-  isInternalUser: boolean;
-  isHost: boolean;
-  startedAt: string;
-  endedAt?: string | null;
-  durationSec: number | null;
-};
-
-export type ViewerDbResultRaw = {
-  time_bucket: Date;
-  count: number;
-  avg_duration: number | null;
-  viewers: RawViewerItem[];
-};
+import { ViewerDbResultRaw } from '../viewer.types';
 
 @Injectable()
 export class ViewerRepository {

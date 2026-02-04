@@ -34,8 +34,27 @@ const getSafeHourlySettlementBoundary = (): Date => {
   else return nowKst.startOf('hour').toDate();
 };
 
+const mapFormatToUnit = (
+  format: 'h' | 'd' | 'm' | 'y',
+): 'hour' | 'day' | 'month' | 'year' => {
+  switch (format) {
+    case 'd':
+      return 'day';
+    case 'm':
+      return 'month';
+    case 'y':
+      return 'year';
+    case 'h':
+      return 'hour';
+  }
+};
+
+const dayjsUtc = (date?: dayjs.ConfigType) => dayjs(date).utc();
+
 export const dateUtil = {
   convertToUtc,
   getSafeDailySettlementBoundary,
   getSafeHourlySettlementBoundary,
+  mapFormatToUnit,
+  dayjsUtc,
 } as const;
