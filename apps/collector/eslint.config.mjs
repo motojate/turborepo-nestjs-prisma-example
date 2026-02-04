@@ -1,3 +1,3 @@
-import nest from '@renderer-orchestrator/eslint-config/eslint-nest.config.mjs';
+import nestConfig from '@renderer-orchestrator/eslint-config/nest';
 
-export default [...nest];
+export default [...nestConfig];
