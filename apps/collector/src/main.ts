@@ -11,9 +11,6 @@ async function bootstrap() {
 
   app.enableShutdownHooks();
 
-  setInterval(() => {
-    console.log(1);
-  }, 1000);
   logger.log('🚀 Data Collector Client Started');
 }
 bootstrap().catch((err) => {
