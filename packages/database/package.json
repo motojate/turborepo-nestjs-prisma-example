@@ -25,9 +25,11 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "gen": "node scripts/manage-generation.mjs",
     "gen:entry": "node scripts/prisma.generate-client-entry.mjs",
+    "db:generate": "pnpm run gen:entry",
     "//": "generated 파일 생성",
-    "postinstall": "pnpm run generate:all && pnpm run gen:entry"
+    "postinstall": "pnpm run db:generate"
   },
   "dependencies": {
     "@prisma/adapter-pg": "7.3.0",

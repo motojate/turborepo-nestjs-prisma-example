@@ -23,6 +23,20 @@
     },
     "clean": {
       "cache": false
+    },
+    "db:generate": {
+      "cache": true,
+
+      "inputs": [
+        "packages/database/configs/prisma/*.ts",
+        "packages/database/scripts/*.mjs",
+        "packages/database/**/*.prisma"
+      ],
+
+      "outputs": [
+        "packages/database/src/prisma/generated/**",
+        "packages/database/src/prisma/client-factory.generated.ts"
+      ]
     }
   }
 }
