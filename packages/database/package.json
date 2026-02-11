@@ -2,18 +2,32 @@
   "name": "@renderer-orchestrator/database",
   "version": "0.0.1",
   "private": true,
-  "type": "commonjs",
+  "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./orm": {
+      "types": "./dist/orm/index.d.ts",
+      "default": "./dist/orm/index.js"
+    },
+    "./prisma": {
+      "types": "./dist/prisma/index.d.ts",
+      "default": "./dist/prisma/index.js"
+    },
+    "./factory": {
+      "types": "./dist/factory/create-prisma-pg-client.d.ts",
+      "default": "./dist/factory/create-prisma-pg-client.js"
     }
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "prisma:generate": "prisma generate"
+    "gen:entry": "node scripts/prisma.generate-client-entry.mjs",
+    "//": "generated 파일 생성",
+    "postinstall": "pnpm run generate:all && pnpm run gen:entry"
   },
   "dependencies": {
     "@prisma/adapter-pg": "7.3.0",

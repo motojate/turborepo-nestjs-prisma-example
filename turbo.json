@@ -2,10 +2,6 @@
   "$schema": "https://turborepo.dev/schema.json",
   "ui": "tui",
   "tasks": {
-    "db:generate": {
-      "cache": true,
-      "inputs": ["prisma/schema.prisma"]
-    },
     "start": {
       "cache": false
     },

@@ -1,5 +1,9 @@
 import { Logger } from '@nestjs/common';
-import { CloseEvent, WebSocket } from 'undici';
+import { WebSocket as UndiciWS } from 'undici';
+import type {
+  MessageEvent as WsMessageEvent,
+  CloseEvent as WsCloseEvent,
+} from 'undici';
 import { WebSocketFactory } from 'src/network/network.module';
 import {
   CollectorTarget,
@@ -8,16 +12,19 @@ import {
 } from '@renderer-orchestrator/common';
 import { randomUUID } from 'crypto';
 
-export class StreamWoker {
-  private ws: WebSocket | null = null;
-  private sendTimer?: NodeJS.Timeout;
+type StopReason = 'manual' | 'error' | 'close';
+
+export class StreamWorker {
+  private readonly logger: Logger;
+
+  private ws: UndiciWS | null = null;
+
+  private pollTimer?: NodeJS.Timeout;
   private reconnectTimer?: NodeJS.Timeout;
 
   private seq = 0;
   private reconnectAttempts = 0;
   private isRunning = false;
-
-  private readonly logger: Logger;
 
   constructor(
     private readonly target: CollectorTarget,
@@ -25,7 +32,7 @@ export class StreamWoker {
     private readonly queue: any[],
   ) {
     this.logger = new Logger(
-      `StreamWorker:${target.url} / ${target.description}`,
+      `StreamWorker:${target.id} / ${target.description}`,
     );
   }
 
@@ -35,6 +42,7 @@ export class StreamWoker {
   start() {
     if (this.isRunning) return;
     this.isRunning = true;
+    this.reconnectAttempts = 0;
     this.connect();
   }
 
@@ -42,48 +50,75 @@ export class StreamWoker {
    * [Public API] 워커 중지 (자원 정리)
    */
   stop() {
+    if (!this.isRunning) return;
     this.isRunning = false;
-    this.cleanup();
+    this.teardown('manual');
     this.logger.log('수집 종료');
   }
 
   private connect() {
     if (!this.isRunning) return;
 
-    // 기존 소켓 정리
-    if (this.ws) {
-      this.ws.close();
-      this.ws = null;
-    }
+    this.teardownSocketOnly();
+
+    this.logger.debug(`연결 시도... (${this.target.url})`);
+    let ws: UndiciWS;
 
     try {
-      this.logger.debug(`연결 시도... (${this.target.url})`);
-
-      const ws = this.createSocket(this.target.url);
-      this.ws = ws;
-
-      // this 바인딩을 위해 화살표 함수나 bind 사용
-      ws.onopen = () => this.handleOpen();
-      //   ws.onmessage = (e) => this.handleMessage(e);
-      ws.onerror = (e) => this.handleError(e);
-      ws.onclose = (e) => this.handleClose(e);
-    } catch (error) {
-      this.logger.error(`초기화 에러: ${error}`);
-      this.scheduleReconnect();
+      ws = this.createSocket(this.target.url);
+    } catch (e) {
+      this.logger.error(`초기화 에러: ${String(e)}`);
+      return this.scheduleReconnect();
     }
+
+    this.ws = ws;
+
+    ws.onopen = () => this.onOpen();
+    ws.onmessage = (e) => this.onMessage(e);
+    ws.onerror = (e) => this.onError(e);
+    ws.onclose = (e) => this.onClose(e);
   }
 
-  private handleOpen() {
+  private onOpen() {
+    if (!this.isRunning) return;
+
     this.logger.log('✅ 연결 성공');
     this.reconnectAttempts = 0;
-    this.startRequestLoop();
+
+    this.startPolling();
   }
 
-  private startRequestLoop() {
-    if (this.sendTimer) clearInterval(this.sendTimer);
+  private onError(event: Event) {
+    const msg = (event as any)?.message ?? 'Unknown';
+    this.logger.error(`소켓 에러: ${msg}`);
 
-    const loop = () => {
-      if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+    this.handleDisconnect('error');
+  }
+
+  private onClose(event: WsCloseEvent) {
+    this.logger.warn(`연결 끊김 (Code: ${event.code})`);
+    this.handleDisconnect('close');
+  }
+
+  private handleDisconnect(_reason: StopReason) {
+    if (!this.isRunning) return;
+
+    this.stopPolling();
+    this.teardownSocketOnly();
+
+    this.scheduleReconnect();
+  }
+
+  private startPolling() {
+    this.stopPolling();
+
+    const tick = () => {
+      if (!this.isRunning) return;
+      if (!this.canSend()) {
+        // 연결 준비가 아니면 잠깐 후 재시도 (재연결은 close/error에서 처리)
+        this.pollTimer = setTimeout(tick, 300);
+        return;
+      }
 
       const payload = JSON.stringify({
         ts: Date.now(),
@@ -93,27 +128,38 @@ export class StreamWoker {
       });
 
       try {
-        this.ws.send(payload);
+        this.ws!.send(payload);
       } catch (e) {
-        this.logger.warn(`전송 실패: ${e}`);
+        this.logger.warn(`전송 실패: ${String(e)}`);
+        // send 실패도 연결 이상일 가능성이 커서 끊김 처리
+        this.handleDisconnect('error');
+        return;
       }
+
+      this.pollTimer = setTimeout(tick, 1000);
     };
 
-    // 즉시 실행 후 1초 간격 반복
-    loop();
-    this.sendTimer = setInterval(loop, 1000);
+    tick();
   }
 
-  private handleMessage(event: MessageEvent) {
-    // 큐 적재 로직 (Fire-and-Forget)
+  private stopPolling() {
+    if (this.pollTimer) clearTimeout(this.pollTimer);
+    this.pollTimer = undefined;
+  }
+
+  private canSend(): boolean {
+    if (!this.ws) return false;
+
+    // undici WebSocket readyState: 0 CONNECTING, 1 OPEN, 2 CLOSING, 3 CLOSED
+    return this.ws.readyState === 1;
+  }
+
+  private onMessage(event: WsMessageEvent) {
     const correlationId = randomUUID();
     const now = Date.now();
 
     try {
-      const payloadStr =
-        typeof event.data === 'string'
-          ? event.data
-          : Buffer.from(event.data as ArrayBuffer).toString('utf-8');
+      const payloadStr = this.decodeMessageData(event.data);
 
       const raw: RawMessage = {
         payload: payloadStr,
@@ -129,46 +175,50 @@ export class StreamWoker {
         receivedAt: now,
         transport: 'ws',
         remote: raw.remote,
-        // source: this.target.name,
       };
 
-      //   this.queue
-      //     .add(
-      //       'ingest',
-      //       { data: raw, ctx },
-      //       {
-      //         jobId: correlationId,
-      //         attempts: 3,
-      //         removeOnComplete: true, // 운영 환경: true
-      //         removeOnFail: 1000,
-      //       },
-      //     )
-      //     .catch((err) => {
-      //       this.logger.error(`Queue Error: ${err.message}`);
-      //     });
+      // 여기서 queue가 BullMQ면 add로 적재
+      // fire-and-forget 유지하되, backpressure 고려하면 await/limiter도 고민 가능
+      // this.queue.add('ingest', { data: raw, ctx }, { jobId: correlationId, attempts: 3, removeOnComplete: true, removeOnFail: 1000 })
+      //   .catch(err => this.logger.error(`Queue Error: ${err?.message ?? err}`));
+      void raw;
+      void ctx;
     } catch (e) {
-      this.logger.error(`Parse Error: ${e}`);
+      this.logger.error(`Parse Error: ${String(e)}`);
     }
   }
 
-  private handleError(event: Event) {
-    const msg = (event as any).message || 'Unknown';
-    this.logger.error(`🔥 소켓 에러: ${msg}`);
+  private decodeMessageData(data: unknown): string {
+    if (typeof data === 'string') return data;
+
+    // undici ws data는 ArrayBuffer / Uint8Array 등이 올 수 있음
+    if (data instanceof ArrayBuffer) {
+      return Buffer.from(data).toString('utf-8');
+    }
+
+    // @ts-ignore: 런타임 방어
+    if (data?.buffer instanceof ArrayBuffer) {
+      // Uint8Array 같은 경우
+      // @ts-ignore
+      return Buffer.from(data).toString('utf-8');
+    }
+
+    // 마지막 fallback
+    return String(data);
   }
 
-  private handleClose(event: CloseEvent) {
-    this.logger.warn(`⚠️ 연결 끊김 (Code: ${event.code})`);
-    if (this.sendTimer) clearInterval(this.sendTimer);
-    this.scheduleReconnect();
-  }
+  // ---------------------------
+  // Reconnect
+  // ---------------------------
 
   private scheduleReconnect() {
-    if (!this.isRunning || this.reconnectTimer) return;
+    if (!this.isRunning) return;
+    if (this.reconnectTimer) return;
 
-    const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30_000);
+    const delay = Math.min(1000 * 2 ** this.reconnectAttempts, 30_000);
+    this.reconnectAttempts++;
 
     this.logger.log(`🔄 ${delay}ms 후 재연결 시도...`);
-    this.reconnectAttempts++;
 
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = undefined;
@@ -176,11 +226,33 @@ export class StreamWoker {
     }, delay);
   }
 
-  private cleanup() {
-    if (this.sendTimer) clearInterval(this.sendTimer);
+  // ---------------------------
+  // Teardown
+  // ---------------------------
+
+  private teardown(reason: StopReason) {
+    this.stopPolling();
+
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
-    if (this.ws) {
+    this.reconnectTimer = undefined;
+
+    this.teardownSocketOnly();
+
+    if (reason === 'manual') {
+      // manual stop이면 재연결 카운터도 리셋해도 됨(선택)
+      this.reconnectAttempts = 0;
+    }
+  }
+
+  private teardownSocketOnly() {
+    if (!this.ws) return;
+
+    try {
+      // 이미 닫힌 상태여도 close 호출은 안전한 편
       this.ws.close();
+    } catch {
+      // ignore
+    } finally {
       this.ws = null;
     }
   }

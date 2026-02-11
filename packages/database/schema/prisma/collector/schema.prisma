@@ -1,0 +1,21 @@
+generator client {
+    provider     = "prisma-client"
+    output       = "../../../src/prisma/generated/collector"
+    moduleFormat = "esm"
+}
+
+datasource db {
+    provider = "postgresql"
+}
+
+model CollectorTarget {
+    id          String  @id @db.VarChar(10)
+    url         String  @unique
+    description String  @default("")
+    enabled     Boolean @default(true)
+
+    createdAt DateTime @default(now()) @map("created_at")
+    updatedAt DateTime @updatedAt @map("updated_at")
+
+    @@map("COLLECTOR_TARGET")
+}
