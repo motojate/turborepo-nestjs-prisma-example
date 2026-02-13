@@ -5,12 +5,16 @@ import {
   OnModuleDestroy,
   OnModuleInit,
 } from '@nestjs/common';
-import { createPrismaPgClient } from '@renderer-orchestrator/database';
-import { PrismaPgHandle } from '@renderer-orchestrator/database/dist/prisma/client-postgresql';
+
 import {
   PRISMA_READ_CLIENT,
   PRISMA_READ_HANDLE,
 } from 'src/common/tokens/prisma.token';
+
+import {
+  createPrismaPgHandle,
+  PrismaPgHandle,
+} from '@renderer-orchestrator/database/src/prisma/client-postgresql';
 
 @Global()
 @Module({
@@ -18,7 +22,8 @@ import {
     {
       provide: PRISMA_READ_HANDLE,
       useFactory: async () => {
-        return createPrismaPgClient({
+        return createPrismaPgHandle({
+          schema: 'api',
           appName: 'api',
           log: ['info', 'query', 'error', 'warn'],
           pool: { max: 50 },
@@ -30,14 +35,14 @@ import {
     {
       provide: PRISMA_READ_CLIENT,
       inject: [PRISMA_READ_HANDLE],
-      useFactory: (h: PrismaPgHandle) => h.client,
+      useFactory: (h: PrismaPgHandle<'api'>) => h.client,
     },
   ],
   exports: [PRISMA_READ_CLIENT],
 })
 export class PrismaModule implements OnModuleInit, OnModuleDestroy {
   constructor(
-    @Inject(PRISMA_READ_HANDLE) private readonly ro: PrismaPgHandle,
+    @Inject(PRISMA_READ_HANDLE) private readonly ro: PrismaPgHandle<'api'>,
   ) {}
   async onModuleInit() {
     await this.ro.ping();

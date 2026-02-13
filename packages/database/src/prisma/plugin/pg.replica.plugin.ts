@@ -1,13 +1,22 @@
 import { readReplicas } from "@prisma/extension-read-replicas";
-import { PrismaClient } from "../../generated/client";
-import { createPrismaPgClient } from "../client-postgresql";
 
-export const applyReplicaPlugin = (prisma: PrismaClient, urls?: string[]) => {
+type ReplicaExtension = ReturnType<typeof readReplicas>;
+
+interface ExtensibleClient {
+  $extends: (args: ReplicaExtension) => unknown;
+}
+
+export const applyReplicaPlugin = <T extends ExtensibleClient>(
+  prisma: T,
+  urls?: string[],
+) => {
   if (!urls || urls.length === 0) return prisma;
 
-  return prisma.$extends(
+  const extendedClient = prisma.$extends(
     readReplicas({
-      replicas: urls.map((url) => createPrismaPgClient({ url })),
+      replicas: urls.map((url) => prisma), // TODO: client create 메서드로 변경.
     }),
   );
+
+  return extendedClient as ReturnType<T["$extends"]>;
 };

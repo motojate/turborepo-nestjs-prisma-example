@@ -1,2 +1,2 @@
-export { createPrismaPgClient } from "./client-postgresql";
+export { createPrismaPgHandle } from "./client-postgresql";
 export * from "./client-factory.generated";
